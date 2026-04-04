@@ -1,23 +1,51 @@
-checkpoint1
-![alt text](checkpoint1_result.png)
+# Assignment1-Preemption 报告
 
-checkpoint2
-根因是：你在内核 Trap 里调用了调度，但没有保存/恢复 CSR 的 sstatus 和 sepc，导致后续 sret 用了“别的上下文”留下的 sstatus。
+## Checkpoint 1
 
-关键点在这里：
+### 结果截图
+![checkpoint1_result](checkpoint1_result.png)
 
-在 entry.S 的 kernel_trap_entry 末尾，返回使用的是 sret。
-根据 RISC-V Privileged Spec 4.1.1，执行 sret 时：
-先按 sstatus.SPP 决定返回到 S/U
-然后硬件会把 SPP 清零
-你的 trap.c 里 kernel_trap 在定时器中断路径会调用 yield（你还临时改了 inkernel_trap 来允许它调度）。
-一旦在 Trap 中 yield -> sched -> swtch，CPU 会去跑别的线程/进程；期间别的 Trap/sret 会改写当前 hart 的 sstatus/sepc。
-等原来那个“卡在 kernel_trap 里”的上下文被切回来时，kernel_trap_entry 直接 sret，但此时 CSR 里的 sstatus 可能已经是 SPP=0（被之前某次 sret 清过），于是这次 sret 真的把内核返回到了 U-mode。
-下一次再进 kernel_trap 时，你的检查 (r_sstatus() & SSTATUS_SPP)==0 就触发，看到的就是 SPP:U panic。
-为什么“总在第一个进程 exit 后更容易出现”：
+### 说明
+- 本题完成了基础的抢占/调度验证流程。
+- 从运行结果看，系统能够正常进入并处理时钟中断，调度路径可达，程序行为符合 checkpoint1 预期。
 
-exit 会触发一次明确的 sched 切换；
-同时其它进程很多都停在 kernel_trap 的 yield 处（你提示里说的现象），这会制造大量“Trap 内调度 -> 回来继续 sret”的场景；
-因此更容易踩到被污染/过期的 sstatus.SPP。
-一句话总结：不是你显式清了 SPP，而是 sret 硬件会清；你在 Trap 中调度但没保护 sstatus/sepc，导致恢复时用错了 SPP。
-![alt text](checkpoint2_result.png)
+## Checkpoint 2
+
+### 结果截图
+![checkpoint2_result](checkpoint2_result.png)
+
+### 说明
+- 问题根因是：在内核 Trap 中触发调度时，没有成对保护/恢复 `sstatus` 与 `sepc`，导致后续 `sret` 使用了被其他上下文影响后的 CSR 状态。
+- 由于 `sret` 会依赖 `SPP` 位决定返回级别，若该位状态不正确，就可能出现异常返回（例如错误回到 U 模式），从而触发 `SPP:U` 类问题。
+- 因此 checkpoint2 的关键是保证 Trap 内调度场景下的上下文一致性，避免 CSR 状态被“串台”。
+- 为什么“总在第一个进程 exit 后更容易出现”：exit 会触发一次明确的 sched 切换；同时其它进程很多都停在 kernel_trap 的 yield 处,这会制造大量“Trap 内调度 -> 回来继续 sret”的场景；因此更容易踩到被污染/过期的 sstatus.SPP。
+
+## Checkpoint 3
+
+### 结果截图
+![checkpoint3_result1](checkpoint3_result1.png)
+![checkpoint3_result2](checkpoint3_result2.png)
+![checkpoint3_result3](checkpoint3_result3.png)
+![checkpoint3_result4](checkpoint3_result4.png)
+![checkpoint3_result5](checkpoint3_result5.png)
+![checkpoint3_result6](checkpoint3_result6.png)
+![checkpoint3_result7](checkpoint3_result7.png)
+![checkpoint3_result8](checkpoint3_result8.png)
+![checkpoint3_result9](checkpoint3_result9.png)
+![checkpoint3_result10](checkpoint3_result10.png)
+
+### 说明
+- checkpoint3 主要体现了并发场景下计数结果的统计特征。
+- `count` 大多数情况下是 `15000`，因为在理想执行中每次自增都被正确保留，最终总和稳定。
+- 少数情况下不是 `15000`，是因为并发下存在竞争（读-改-写交错、抢占导致的丢失更新），因此会出现小概率偏差。
+
+## 完成作业耗时
+
+- 约 5 小时。
+
+## 遇到的困难
+
+- 主要困难在 checkpoint2，需要结合 lab 文档理解 trap 与调度切换细节后才能准确作答。
+
+
+
