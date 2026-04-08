@@ -1,6 +1,6 @@
 # README 维护规范（readme maintenance）
 
-更新日期：2026-04-01
+更新日期：2026-04-08
 
 ## 1. 维护目标
 
@@ -44,3 +44,6 @@
 - 新增维护规范文件：`readme maintenance.md`
 - 同步更新主文档：`README.md`
 - 维护执行日期：2026-04-01
+- 同步仓库结构：补充 `Lab/lab7/` 与 `Assignment/assignment1.pdf`
+- 优化快速开始：新增 `Lab/lab2` 示例命令
+- 维护执行日期：2026-04-08
