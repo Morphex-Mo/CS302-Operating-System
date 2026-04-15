@@ -47,3 +47,6 @@
 - 同步仓库结构：补充 `Lab/lab7/` 与 `Assignment/assignment1.pdf`
 - 优化快速开始：新增 `Lab/lab2` 示例命令
 - 维护执行日期：2026-04-08
+- 同步仓库结构：补充 `Assignment/assignment2-uaccess/`、`Lab/lab8/` 与 `Quiz/Quiz3.pdf`、`Quiz/Quiz4.pdf`
+- 更新 `README.md` 的目录树、快速开始与最后更新日期
+- 维护执行日期：2026-04-15
