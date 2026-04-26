@@ -82,6 +82,8 @@ void scheduler() {
         debugf("switch to proc %d(%d)", p->index, p->pid);
         p->state = RUNNING;
         c->proc  = p;
+        // prepare the process context satp so swtch will restore it
+        p->context.satp = MAKE_SATP(KVA_TO_PA(p->mm->pgt));
         swtch(&c->sched_context, &p->context);
 
         // When we get back here, someone must have called swtch(..., &c->sched_context);
@@ -111,7 +113,17 @@ void sched() {
     if (!holding(&p->lock))
         panic("not holding p->lock");
     if (mycpu()->noff != 1)
+    {
+        struct proc *pp = curr_proc();
+        // errorf("sched: noff=%d, interrupt_on=%d, inkernel_trap=%d", mycpu()->noff, mycpu()->interrupt_on, mycpu()->inkernel_trap);
+        if (pp) {
+            // errorf("sched: curr pid=%d, holding p->lock=%d", pp->pid, holding(&pp->lock));
+            if (pp->mm) {
+                // errorf("sched: holding mm->lock=%d", holding(&pp->mm->lock));
+            }
+        }
         panic("holding another locks");
+    }
     if (p->state == RUNNING)
         panic("sched running process");
     if (mycpu()->inkernel_trap)
@@ -120,6 +132,8 @@ void sched() {
 
     interrupt_on = mycpu()->interrupt_on;
     debugf("switch to scheduler %d(%d)", p->index, p->pid);
+    // ensure scheduler context will restore kernel pagetable when switched to
+    mycpu()->sched_context.satp = MAKE_SATP(KVA_TO_PA(kernel_pagetable));
     swtch(&p->context, &mycpu()->sched_context);
     mycpu()->interrupt_on = interrupt_on;
 

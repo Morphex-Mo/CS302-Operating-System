@@ -75,6 +75,50 @@ void kernel_trap(struct ktrapframe *ktf) {
         }
     } else {
         // kernel exception, unexpected.
+        // If this is a page-fault on a user virtual address that happened
+        // during a user-copy (uaccess) operation, terminate the process
+        // instead of panicking the whole kernel.
+        uint64 exception_code = cause & SCAUSE_EXCEPTION_CODE_MASK;
+        uint64 fault_addr = r_stval();
+        if ((exception_code == LoadPageFault || exception_code == StorePageFault || exception_code == InstructionPageFault) && IS_USER_VA(fault_addr)) {
+            struct proc *p = curr_proc();
+                if (p) {
+                // errorf("page fault on user address %p in kernel context, killing pid %d", fault_addr, p->pid);
+                // errorf("debug: before handling fault: noff=%d, inkernel_trap=%d", mycpu()->noff, mycpu()->inkernel_trap);
+                // If the process held its mm lock while performing uaccess,
+                // release it now so that exit() won't deadlock or violate
+                // the scheduler's lock expectations (noff count).
+                if (p->mm) {
+                    if (holding(&p->mm->lock)) {
+                        // errorf("debug: releasing mm->lock in trap");
+                        // Prevent pop_off from re-enabling interrupts while
+                        // we are still in kernel_trap: temporarily clear
+                        // mycpu()->interrupt_on, release the lock, then
+                        // restore and re-enable interrupts if needed.
+                        struct cpu *c = mycpu();
+                        int old_intr_on = c->interrupt_on;
+                        c->interrupt_on = 0;
+                        release(&p->mm->lock);
+                        // errorf("debug: after release mm->lock: noff=%d", c->noff);
+
+                        // We will drop kernel_trap state before restoring interrupts.
+                        mycpu()->inkernel_trap--;
+                        // errorf("debug: after decr inkernel_trap=%d", mycpu()->inkernel_trap);
+
+                        // Restore previous interrupt_on and re-enable interrupts
+                        // if necessary (noff==0 and not in kernel_trap).
+                        c->interrupt_on = old_intr_on;
+                        if (old_intr_on && c->noff == 0 && c->inkernel_trap == 0) {
+                            intr_on();
+                        }
+
+                        // Now exit the process.
+                        exit(-9);
+                    }
+                }
+                // exit() should not return; if it does, fall through to panic.
+            }
+        }
         goto kernel_panic;
     }
 

@@ -7,6 +7,10 @@
 
 .globl swtch
 swtch:
+        # save current satp to old context
+        csrr t0, satp
+        sd t0, 112(a0)
+
         sd ra, 0(a0)
         sd sp, 8(a0)
         sd s0, 16(a0)
@@ -36,5 +40,10 @@ swtch:
         ld s9, 88(a1)
         ld s10, 96(a1)
         ld s11, 104(a1)
+
+        # restore satp from new context and flush TLB
+        ld t0, 112(a1)
+        csrw satp, t0
+        sfence.vma zero, zero
 
         ret

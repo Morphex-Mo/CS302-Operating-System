@@ -4,38 +4,40 @@
 #include "string.h"
 
 static int access_ok(struct mm* mm, uint64 addr, uint64 len) {
-	// Assignment 2: Your code here
-	return 0;
+    // Validate that the [addr, addr+len) range lies within user virtual
+    // address space (below TRAPFRAME). Do not consult page tables here.
+    if (len == 0)
+        return 1;
+    // Prevent overflow: ensure addr + len - 1 does not wrap.
+    if (addr > MAX_USERVA)
+        return 0;
+    if (len - 1 > (uint64)MAX_USERVA - addr)
+        return 0;
+    // Ensure the entire range is below TRAPFRAME (MAX_USERVA).
+    return 1;
 } 
 
 static void begin_user_access() {
-	// Assignment 2: Your code here
+    // Allow supervisor to access user memory by setting SUM.
+    uint64 s = r_sstatus();
+    w_sstatus(s | SSTATUS_SUM);
 }
 
 static void end_user_access() {
-	// Assignment 2: Your code here
+    // Clear SUM to restore previous privilege semantics.
+    uint64 s = r_sstatus();
+    w_sstatus(s & ~SSTATUS_SUM);
 }
 
 // Copy from kernel to user.
 // Copy len bytes from src to virtual address dstva in a given page table.
 // Return 0 on success, -1 on error.
 int copy_to_user(struct mm *mm, uint64 __user dstva, char *src, uint64 len) {
-    uint64 n, va0, pa0;
-
-    while (len > 0) {
-        va0 = PGROUNDDOWN(dstva);
-        pa0 = walkaddr(mm, va0);
-        if (pa0 == 0)
-            return -EINVAL;
-        n = PGSIZE - (dstva - va0);
-        if (n > len)
-            n = len;
-        memmove((void *)(PA_TO_KVA(pa0) + (dstva - va0)), src, n);
-
-        len -= n;
-        src += n;
-        dstva = va0 + PGSIZE;
-    }
+    if (!access_ok(mm, dstva, len))
+        return -EINVAL;
+    begin_user_access();
+    memmove((void *)dstva, src, len);
+    end_user_access();
     return 0;
 }
 
@@ -43,22 +45,11 @@ int copy_to_user(struct mm *mm, uint64 __user dstva, char *src, uint64 len) {
 // Copy len bytes to dst from virtual address srcva in a given page table.
 // Return 0 on success, -1 on error.
 int copy_from_user(struct mm *mm, char *dst, uint64 __user srcva, uint64 len) {
-    uint64 n, va0, pa0;
-
-    while (len > 0) {
-        va0 = PGROUNDDOWN(srcva);
-        pa0 = walkaddr(mm, va0);
-        if (pa0 == 0)
-            return -EINVAL;
-        n = PGSIZE - (srcva - va0);
-        if (n > len)
-            n = len;
-        memmove(dst, (void *)(PA_TO_KVA(pa0) + (srcva - va0)), n);
-
-        len -= n;
-        dst += n;
-        srcva = va0 + PGSIZE;
-    }
+    if (!access_ok(mm, srcva, len))
+        return -EINVAL;
+    begin_user_access();
+    memmove(dst, (void *)srcva, len);
+    end_user_access();
     return 0;
 }
 

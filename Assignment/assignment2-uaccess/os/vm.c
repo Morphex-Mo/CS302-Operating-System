@@ -121,6 +121,15 @@ void mm_copy_kpgt(struct mm *mm) {
         pte_t *kpte = (pte_t *)&kernel_pagetable[i];
         pte_t *upte = (pte_t *)&mm->pgt[i];
         // Assignment 2: Your code here
+        // Copy kernel top-level page table entries into user page table
+        // so that user pagetable contains kernel mappings as well.
+        // Kernel PTEs do not have PTE_U bit set; ensure user PTEs also
+        // do not gain PTE_U.
+        if (*kpte & PTE_V) {
+            *upte = (*kpte) & ~PTE_U;
+        } else {
+            *upte = 0;
+        }
     }
 }
 
