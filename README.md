@@ -1,6 +1,6 @@
 # CS302 Operating System 学习记录
 
-最后更新：2026-04-15
+最后更新：2026-05-06
 
 这是一个用于记录 CS302（Operating System）课程学习过程的仓库，包含 Assignment、Lab、Quiz 与课程相关资料。内容以实验代码、课程练习和复习笔记为主，仅供学习交流参考。
 
@@ -19,15 +19,9 @@ CS302-Operating-System/
 ├── readme maintenance.md
 ├── Assignment/
 │   ├── assignment1-Preemption/
-│   │   ├── Makefile
-│   │   ├── report.md
-│   │   ├── os/
-│   │   └── scripts/
-│   └── assignment2-uaccess/
-│       ├── Makefile
-│       ├── os/
-│       ├── scripts/
-│       └── user/
+│   ├── assignment2-uaccess/
+│   ├── assignment3-cow/
+│   └── assignment4-sched/
 ├── Lab/
 │   ├── lab2/
 │   ├── lab3/
@@ -36,6 +30,9 @@ CS302-Operating-System/
 │   ├── lab6/
 │   ├── lab7/
 │   ├── lab8/
+│   ├── lab9/
+│   ├── lab10/
+│   ├── lab11/
 │   └── os-riscv-refs/
 ├── Quiz/
 │   ├── Quiz2.pdf
@@ -43,8 +40,13 @@ CS302-Operating-System/
 │   ├── Quiz3.pdf
 │   ├── Quiz4.pdf
 │   ├── Quiz5.pdf
-│   └── Quiz5_Answer.md
-└── lecture/
+│   ├── Quiz5_Answer.md
+│   ├── Quiz6.pdf
+│   ├── Quiz6_Answer.md
+│   ├── Quiz7.pdf
+│   └── Quiz7_Answer.md
+├── lecture/
+└── project/
 ```
 
 ## Assignment
@@ -52,16 +54,22 @@ CS302-Operating-System/
 - `Assignment/assignment1-Preemption/`：抢占相关作业目录。
 - 包含内核源码目录 `os/`、构建配置 `Makefile`、实验报告 `report.md` 与辅助脚本 `scripts/`。
 - `Assignment/assignment2-uaccess/`：用户态访问相关作业目录，包含内核源码、用户程序与相关脚本。
+ - `Assignment/assignment3-cow/`：Copy-on-write（写时复制）相关作业目录。
+ - `Assignment/assignment4-sched/`：调度相关作业目录。
 
 ## Lab
 
 - `Lab/lab2/` 到 `Lab/lab8/`：课程实验代码与练习。
 - `Lab/os-riscv-refs/`：RISC-V 参考资料。
+ - `Lab/lab2/` 到 `Lab/lab11/`：课程实验代码与练习（含 lab9/lab10/lab11）。
+ - `Lab/os-riscv-refs/`：RISC-V 参考资料。
 
 ## Quiz
 
 - `Quiz/Quiz2.pdf`、`Quiz/Quiz3.pdf`、`Quiz/Quiz4.pdf`、`Quiz/Quiz5.pdf`：课堂 Quiz 题目资料。
 - `Quiz/Quiz2_Answer.md`、`Quiz/Quiz5_Answer.md`：已整理的 Quiz 答案与复习记录。
+ - `Quiz/Quiz2.pdf` 到 `Quiz/Quiz7.pdf`：课堂 Quiz 题目资料（已收集至 Quiz7）。
+ - `Quiz/Quiz2_Answer.md`、`Quiz/Quiz5_Answer.md`、`Quiz/Quiz6_Answer.md`、`Quiz/Quiz7_Answer.md`：整理的 Quiz 答案与复习记录（如有）。
 
 ## 快速开始（示例）
 
