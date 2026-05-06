@@ -6,6 +6,16 @@
 #include "queue.h"
 #include "trap.h"
 
+extern struct spinlock tickslock;
+extern uint64 ticks;
+
+static int proc_quantum(int priority) {
+    int quantum = FULL_QUANTUM - priority * 2;
+    if (quantum < 1)
+        quantum = 1;
+    return quantum;
+}
+
 struct proc *pool[NPROC];
 struct proc *init_proc = NULL;
 static allocator_t proc_allocator;
@@ -95,6 +105,12 @@ found:
     p->exit_code  = 0;
     p->sleep_chan = NULL;
     p->pid        = allocpid();
+    p->priority   = 0;
+    p->quantum    = FULL_QUANTUM;
+    acquire(&tickslock);
+    p->create_ticks = ticks;
+    p->run_ticks    = 0;
+    release(&tickslock);
     p->state      = USED;
 
     // fork or exec(load_user_elf) will initialize these:
@@ -210,6 +226,12 @@ int fork() {
     // Cause fork to return 0 in the child.
     np->trapframe->a0 = 0;
     np->parent        = p;
+    np->priority      = p->priority;
+    np->quantum       = proc_quantum(np->priority);
+    acquire(&tickslock);
+    np->create_ticks = ticks;
+    np->run_ticks    = 0;
+    release(&tickslock);
     np->state         = RUNNABLE;
     add_task(np);
     release(&np->lock);
@@ -338,6 +360,15 @@ void exit(int code) {
 
     p->exit_code = code;
     p->state     = ZOMBIE;
+
+        acquire(&tickslock);
+        uint64 now        = ticks;
+        uint64 turnaround = now - p->create_ticks;
+        uint64 waiting    = turnaround - p->run_ticks;
+        release(&tickslock);
+
+        printf("proc %d exit: priority=%d waiting=%d turnaround=%d runtime=%d\n",
+            p->pid, p->priority, (int)waiting, (int)turnaround, (int)p->run_ticks);
 
     release(&wait_lock);
 

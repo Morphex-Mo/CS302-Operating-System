@@ -30,6 +30,13 @@ static int handle_intr(void) {
     uint64 code  = cause & SCAUSE_EXCEPTION_CODE_MASK;
     if (code == SupervisorTimer) {
         tracef("time interrupt!");
+        struct proc *p = mycpu()->proc;
+        if (p != NULL) {
+            acquire(&p->lock);
+            if (p->state == RUNNING)
+                p->run_ticks++;
+            release(&p->lock);
+        }
         if (cpuid() == 0) {
             acquire(&tickslock);
             ticks++;
@@ -200,7 +207,7 @@ void usertrap() {
 
     // if it's a timer intr, call yield to give up CPU.
     if (which_dev == 1)
-        yield();
+        yield_timer();
 
     // prepare for return to user mode
     assert(!intr_get());

@@ -50,6 +50,10 @@ struct proc {
     // p->lock must be held when accessing to these fields:
     enum procstate state;  // Process state
     int pid;               // Process ID
+    int priority;
+    int quantum;
+    uint64 create_ticks;
+    uint64 run_ticks;
     int exit_code;
     void *sleep_chan;
     int killed;
@@ -99,6 +103,7 @@ void wakeup(void *chan);
 void scheduler() __attribute__((noreturn));
 void sched();
 void yield();
+void yield_timer();
 void add_task(struct proc *);
 void setpriority(int priority);
 

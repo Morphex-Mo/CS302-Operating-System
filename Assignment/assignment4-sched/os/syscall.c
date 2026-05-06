@@ -170,7 +170,8 @@ int64 sys_write(int fd, uint64 __user va, uint len) {
 }
 
 int64 sys_setpriority(int priority) {
-    // TODO: Assignment 4
+    if (priority < 0 || priority >= 10)
+        return -EINVAL;
     setpriority(priority);
     return 0;
 }
@@ -225,7 +226,7 @@ void syscall() {
             ret = ktest_syscall(args);
             break;
         case SYS_setpriority:
-        ret = sys_setpriority(args[0]);
+            ret = sys_setpriority(args[0]);
             break;
         default:
             ret = -1;

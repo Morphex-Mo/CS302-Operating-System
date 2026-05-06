@@ -5,6 +5,13 @@
 #include "queue.h"
 #include "trap.h"
 
+static int proc_quantum(int priority) {
+    int quantum = FULL_QUANTUM - priority * 2;
+    if (quantum < 1)
+        quantum = 1;
+    return quantum;
+}
+
 static struct queue task_queue;
 
 // defined in proc.c
@@ -139,6 +146,23 @@ void yield() {
     release(&p->lock);
 }
 
+void yield_timer() {
+    struct proc *p = curr_proc();
+
+    acquire(&p->lock);
+    if (p->quantum > 0)
+        p->quantum--;
+    if (p->quantum > 0) {
+        release(&p->lock);
+        return;
+    }
+
+    p->quantum = proc_quantum(p->priority);
+    p->state   = RUNNABLE;
+    sched();
+    release(&p->lock);
+}
+
 /**
  * Set the priority of the current process.
  * The priority is an integer between 0 and 10, where 0 is the highest priority. (has more time slice)
@@ -148,7 +172,8 @@ void setpriority(int priority) {
     if (priority < 0 || priority >= 10)
         return;
 
-    // TODO:
-    
-    return ;
+    acquire(&p->lock);
+    p->priority = priority;
+    p->quantum  = proc_quantum(priority);
+    release(&p->lock);
 }
