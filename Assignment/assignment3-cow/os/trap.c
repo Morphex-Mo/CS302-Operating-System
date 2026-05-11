@@ -124,8 +124,9 @@ static void handle_pgfault(void) {
     mm = p->mm;
     acquire(&mm->lock);
     release(&p->lock);
-    pte = walk(mm, addr, 0);
-    release(&mm->lock);
+
+    uint64 va = PGROUNDDOWN(addr);
+    pte = walk(mm, va, 0);
 
     //	docs: Volume II: RISC-V Privileged Architectures V1.10, Page 61,
     //		> Two schemes to manage the A and D bits are permitted:
@@ -140,12 +141,37 @@ static void handle_pgfault(void) {
             // - Store PageFault  : Missing A/D bit
             *pte |= PTE_A;
             if (cause == StorePageFault)
-                *pte |= PTE_D;    
+                *pte |= PTE_D;
+            release(&mm->lock);
             return;
         }
     }
-    // Assignment 3 CoW: do copy here.
 
+    // Assignment 3 CoW: handle write faults on COW pages.
+    if (pte != NULL && (*pte & PTE_V) && (*pte & PTE_U) && cause == StorePageFault && (*pte & PTE_A3_COW)) {
+        void *newpa = kallocpage();
+        if (!newpa) {
+            release(&mm->lock);
+            setkilled(p, -2);
+            return;
+        }
+
+        uint64 oldpa = PTE2PA(*pte);
+        memmove((void *)PA_TO_KVA(newpa), (void *)PA_TO_KVA(oldpa), PGSIZE);
+        page_refcnt_increase((uint64)newpa);
+
+        uint64 flags = (PTE_FLAGS(*pte) | PTE_W) & ~PTE_A3_COW;
+        *pte = PA2PTE(newpa) | flags;
+        sfence_vma();
+
+        int8 cnt = page_refcnt_decrease(oldpa);
+        if (cnt == 0)
+            kfreepage((void *)oldpa);
+        release(&mm->lock);
+        return;
+    }
+
+    release(&mm->lock);
 
     // otherwise, it is a page fault due to invalid address
     infof("page fault in application, bad addr = %p, bad instruction = %p, core dumped.", r_stval(), p->trapframe->epc);

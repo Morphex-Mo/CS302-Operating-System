@@ -9,13 +9,30 @@
 // Return 0 on success, -1 on error.
 int copy_to_user(struct mm *mm, uint64 __user dstva, char *src, uint64 len) {
     uint64 n, va0, pa0;
+    pte_t *pte;
 
     while (len > 0) {
         va0 = PGROUNDDOWN(dstva);
-        pa0 = walkaddr(mm, va0);
-        // Assignment 3 CoW: do CoW if the page is marked as CoW page.
-        if (pa0 == 0)
+        pte = walk(mm, va0, 0);
+        if (pte == NULL || !(*pte & PTE_V) || !(*pte & PTE_U))
             return -EINVAL;
+        if ((*pte & PTE_A3_COW) && !(*pte & PTE_W)) {
+            void *newpa = kallocpage();
+            if (!newpa)
+                return -ENOMEM;
+            uint64 oldpa = PTE2PA(*pte);
+            memmove((void *)PA_TO_KVA(newpa), (void *)PA_TO_KVA(oldpa), PGSIZE);
+            page_refcnt_increase((uint64)newpa);
+
+            uint64 flags = (PTE_FLAGS(*pte) | PTE_W | PTE_D) & ~PTE_A3_COW;
+            *pte = PA2PTE(newpa) | flags;
+            sfence_vma();
+
+            int8 cnt = page_refcnt_decrease(oldpa);
+            if (cnt == 0)
+                kfreepage((void *)oldpa);
+        }
+        pa0 = PTE2PA(*pte);
         n = PGSIZE - (dstva - va0);
         if (n > len)
             n = len;

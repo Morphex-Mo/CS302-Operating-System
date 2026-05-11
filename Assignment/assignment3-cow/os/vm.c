@@ -23,10 +23,10 @@ int8 page_refcnt_increase(uint64 pa) {
     // Hint: pa must fit in this range: [RISCV_DDR_BASE, RISCV_DDR_BASE + PHYS_MEM_SIZE)
     //  For each page (Page-Aligned PA), we use an element (int8) in the `refcnt` array to represent its refcnt.
 
-    uint64 idx = 0;
-    // TODO: calculate the index of pa into the `refcnt` array.
+    uint64 idx = (pa - RISCV_DDR_BASE) / PGSIZE;
     assert(idx < NR_OF_PAGES);  // never overflow
-    return 0;
+    refcnt[idx]++;
+    return refcnt[idx];
 }
 
 /**
@@ -35,10 +35,11 @@ int8 page_refcnt_increase(uint64 pa) {
 int8 page_refcnt_decrease(uint64 pa) {
     assert(PGALIGNED(pa));
     assert(VALID_PHYS_ADDR(pa));
-    uint64 idx = 0;
-    // TODO: calculate the index of pa into the `refcnt` array.
+    uint64 idx = (pa - RISCV_DDR_BASE) / PGSIZE;
     assert(idx < NR_OF_PAGES);  // never overflow
-    return 0;
+    assert(refcnt[idx] > 0);
+    refcnt[idx]--;
+    return refcnt[idx];
 }
 
 
@@ -179,8 +180,12 @@ static void freevma(struct vma *vma, int free_phy_page) {
     for (uint64 va = vma->vm_start; va < vma->vm_end; va += PGSIZE) {
         pte_t *pte = walk(mm, va, false);
         if (pte && (*pte & PTE_V)) {
-            if (free_phy_page)
-                kfreepage((void *)PTE2PA(*pte));
+            if (free_phy_page) {
+                uint64 pa = PTE2PA(*pte);
+                int8 cnt  = page_refcnt_decrease(pa);
+                if (cnt == 0)
+                    kfreepage((void *)pa);
+            }
             *pte = 0;
         } else {
             debugf("free unmapped address %p", va);
@@ -297,6 +302,8 @@ int mm_mappages(struct vma *vma) {
             ret = -ENOMEM;
             goto bad;
         }
+        if (vma->pte_flags & PTE_U)
+            page_refcnt_increase((uint64)pa);
         // memset((void *)PA_TO_KVA(pa), 0, PGSIZE);
         *pte = PA2PTE(pa) | vma->pte_flags | PTE_V;
     }
@@ -334,7 +341,7 @@ int mm_mappages_cow(struct vma *vma, struct vma* oldvma) {
     assert((vma->pte_flags & PTE_R) || (vma->pte_flags & PTE_W) || (vma->pte_flags & PTE_X));
 
     // cow: checking vma == oldvma
-    assert(oldvma->vm_start == oldvma->vm_start && oldvma->vm_end == oldvma->vm_end && oldvma->pte_flags == vma->pte_flags);
+    assert(oldvma->vm_start == vma->vm_start && oldvma->vm_end == vma->vm_end && oldvma->pte_flags == vma->pte_flags);
 
     assert(holding(&vma->owner->lock));
 
@@ -353,9 +360,32 @@ int mm_mappages_cow(struct vma *vma, struct vma* oldvma) {
     int ret = 0;
 
     for (va = vma->vm_start; va < vma->vm_end; va += PGSIZE) {
-        // Assignment 3: CoW: TODO:
-        ret = -EINVAL;
-        goto bad;
+        pte_t *oldpte = walk(oldmm, va, 0);
+        if (oldpte == NULL || !(*oldpte & PTE_V)) {
+            errorf("cow walk oldpte failed, va = %p", va);
+            ret = -EINVAL;
+            goto bad;
+        }
+        if ((pte = walk(mm, va, 1)) == 0) {
+            errorf("cow walk pte failed, va = %p", va);
+            ret = -ENOMEM;
+            goto bad;
+        }
+        if (*pte & PTE_V) {
+            errorf("cow remap %p", va);
+            ret = -EINVAL;
+            goto bad;
+        }
+
+        pa = (void *)PTE2PA(*oldpte);
+        uint64 flags = PTE_FLAGS(*oldpte);
+        if ((flags & PTE_W) || (flags & PTE_A3_COW)) {
+            flags = (flags & ~PTE_W) | PTE_A3_COW;
+            *oldpte = PA2PTE(pa) | flags;
+        }
+        *pte = PA2PTE(pa) | flags;
+        if (vma->pte_flags & PTE_U)
+            page_refcnt_increase((uint64)pa);
     }
     sfence_vma();
 
@@ -421,6 +451,8 @@ int mm_remap(struct vma *vma, uint64 start, uint64 end, uint64 pte_flags) {
                     errorf("kallocpage, va = %p", va);
                     goto err;
                 }
+                if (pte_flags & PTE_U)
+                    page_refcnt_increase((uint64)pa);
                 *pte = PA2PTE(pa) | pte_flags | PTE_V;
             }
         }
@@ -483,16 +515,11 @@ int mm_copy(struct mm *old, struct mm *new) {
         new_vma->vm_start   = vma->vm_start;
         new_vma->vm_end     = vma->vm_end;
         new_vma->pte_flags  = vma->pte_flags;
-        if (mm_mappages(new_vma)) {
-            warnf("mm_mappages failed");
+        if (mm_mappages_cow(new_vma, vma)) {
+            warnf("mm_mappages_cow failed");
             // when failed, new_vma is not inserted into mm->vma list.
             // , and it is freed by mm_mappages.
             goto err;
-        }
-        for (uint64 va = vma->vm_start; va < vma->vm_end; va += PGSIZE) {
-            void *__kva pa_old = (void *)PA_TO_KVA(walkaddr(old, va));
-            void *__kva pa_new = (void *)PA_TO_KVA(walkaddr(new, va));
-            memmove(pa_new, pa_old, PGSIZE);
         }
         vma = vma->next;
     }
