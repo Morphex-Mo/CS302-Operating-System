@@ -33,6 +33,8 @@ CS302-Operating-System/
 │   ├── lab9/
 │   ├── lab10/
 │   ├── lab11/
+│   ├── lab12/
+│   ├── lab13/
 │   └── os-riscv-refs/
 ├── Quiz/
 │   ├── Quiz2.pdf
