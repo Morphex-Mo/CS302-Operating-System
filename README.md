@@ -1,6 +1,6 @@
 # CS302 Operating System 学习记录
 
-最后更新：2026-06-08
+最后更新：2026-06-21
 
 这是一个用于记录 CS302（Operating System）课程学习过程的仓库，包含 Assignment、Lab、Quiz 与课程相关资料。内容以实验代码、课程练习和复习笔记为主，仅供学习交流参考。
 
@@ -81,6 +81,7 @@ CS302-Operating-System/
 ## Project
 
 - `project/project-team5/`：团队项目协作区，包含完整的操作系统项目代码、文档和说明文件。
+- 详情参考：https://github.com/sustech-os-2026spring/project-team5/tree/main
 
 ## 快速开始（示例）
 
